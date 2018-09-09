@@ -14,6 +14,8 @@ class ViewController: UIViewController, ARSCNViewDelegate {
 
     @IBOutlet var sceneView: ARSCNView!
     
+    var currentAngleY: Float = 0
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         
@@ -24,17 +26,48 @@ class ViewController: UIViewController, ARSCNViewDelegate {
         sceneView.showsStatistics = true
         
         // Create a new scene
-        let scene = SCNScene(named: "art.scnassets/ship.scn")!
+        let scene = SCNScene(named: "art.scnassets/CoffeeMug/model.dae")!
+        self.sceneView?.autoenablesDefaultLighting = true
+        self.sceneView.scene = scene
         
-        // Set the scene to the view
-        sceneView.scene = scene
+//        let shipNode = scene.rootNode.childNode(withName: "model", recursively: true)!
+        let mugNode = scene.rootNode.childNodes[0]
+        mugNode.scale = SCNVector3(0.01, 0.01, 0.01)
+        
+        let (minVec, maxVec) = mugNode.boundingBox
+        mugNode.pivot = SCNMatrix4MakeTranslation((maxVec.x - minVec.x) / 2 + minVec.x, 0, (maxVec.z - minVec.z) / 2 + minVec.z)
+        
+        let rotateGesture = UIPanGestureRecognizer(target: self, action: #selector(rotateModels(_:)))
+        sceneView.addGestureRecognizer(rotateGesture)
     }
+    
+    @objc func rotateModels(_ gesture: UIPanGestureRecognizer) {
+        let translation = gesture.translation(in: gesture.view!)
+        var newAngleY = (Float)(translation.x)*(Float)(Double.pi)/180.0
+        newAngleY += currentAngleY
+        
+        DispatchQueue.main.async {
+            self.sceneView.scene.rootNode.enumerateChildNodes { (node, _) in
+                node.eulerAngles.y = newAngleY
+            }
+        }
+        
+        if(gesture.state == .ended) { currentAngleY = newAngleY }
+    }
+    
+    func addAnimation(node: SCNNode) {
+        let rotateOne = SCNAction.rotateBy(x: 0, y: CGFloat(Float.pi), z: 0, duration: 5.0)
+        let repeatForever = SCNAction.repeatForever(rotateOne)
+        node.runAction(repeatForever)
+    }
+    
     
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         
         // Create a session configuration
         let configuration = ARWorldTrackingConfiguration()
+        configuration.isLightEstimationEnabled = true
 
         // Run the view's session
         sceneView.session.run(configuration)
